@@ -1,0 +1,122 @@
+{% extends 'master.html' %}
+{% load static %}
+
+{% block title %}
+    <title>Dashboard</title>
+{% endblock %}
+
+{% block content %}
+    <!-- Page Heading -->
+    <h1 class="h3 mb-2 text-gray-800">Charts</h1>
+
+    <!-- Content Row -->
+    <div class="row">
+
+        <!-- Area Chart -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Deposits Over Time</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-area">
+                        <canvas id="myAreaChart"></canvas>
+                    </div>
+                    <hr>
+                    Styling for the area chart can be found in the file.
+                </div>
+            </div>
+
+            <!-- Bar Chart -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Deposits by Status</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="myBarChart"></canvas>
+                    </div>
+                    <hr>
+                    Styling for the bar chart can be found in the file.
+                </div>
+            </div>
+        </div>
+
+        <!-- Donut Chart -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="card shadow mb-4">
+                <!-- Card Header - Dropdown -->
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Deposits by Type</h6>
+                </div>
+                <!-- Card Body -->
+                <div class="card-body">
+                    <div class="chart-pie pt-4">
+                        <canvas id="myPieChart"></canvas>
+                    </div>
+                    <hr>
+                    Styling for the pie chart can be found in the file.
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <!-- Page level plugins -->
+    <script src="{% static 'vendor/chart.js/Chart.min.js' %}"></script>
+
+    <!-- Dynamic Chart Scripts -->
+    <script>
+        // Fetch and display data for the Area Chart (Deposits Over Time)
+        fetch("{% url 'deposit_line_chart' %}")
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('myAreaChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: data.data,
+                    options: {
+                        title: {
+                            display: true,
+                            text: data.title
+                        }
+                    }
+                });
+            });
+
+        // Fetch and display data for the Bar Chart (Deposits by Status)
+        fetch("{% url 'deposit_bar_chart' %}")
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('myBarChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: data.data,
+                    options: {
+                        title: {
+                            display: true,
+                            text: data.title
+                        }
+                    }
+                });
+            });
+
+        // Fetch and display data for the Donut Chart (Deposits by Type)
+        fetch("{% url 'deposit_pie_chart' %}")
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('myPieChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'pie',
+                    data: data.data,
+                    options: {
+                        title: {
+                            display: true,
+                            text: data.title
+                        }
+                    }
+                });
+            });
+    </script>
+{% endblock %}
