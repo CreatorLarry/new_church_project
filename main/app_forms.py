@@ -4,18 +4,21 @@ from django.contrib.auth.models import User
 from main.models import Member, Deposit
 
 GENDER_CHOICES = {"Male": "Male", "Female": "Female"}
+DEPARTMENT_CHOICES = {"KAYO": "KAYO", "KAMA": "KAMA", "Mothers' Union": "Mothers' Union"}
+DEPOSIT_CHOICES = {"Offertory": "Offertory", "Thanksgiving": "Thanksgiving", "Tithe": "Tithe", "First Fruit": "First Fruit", "Church Project": "Church Project", "Department Registration": "Department Registration", "Others": "Others"}
 class MemberForm(forms.ModelForm):
     gender = forms.ChoiceField(choices=GENDER_CHOICES, widget=forms.RadioSelect)
+    department = forms.ChoiceField(choices=DEPARTMENT_CHOICES, widget=forms.RadioSelect)
     class Meta:
         model = Member
         fields = ['first_name', 'last_name', 'email', 'dob', 'department', 'gender', 'profile_pic']
         widgets = {
             'dob' : forms.DateInput(attrs={'type': 'date', 'min':'1980-01-01', 'max':'2005-12-31'}),
-            'weight': forms.NumberInput(attrs={'type': 'number', 'min':'35', 'max':'100'})
         }
 
 
 class DepositForm(forms.ModelForm):
+    deposits = forms.ChoiceField(choices=DEPOSIT_CHOICES, widget=forms.RadioSelect)
     class Meta:
         model = Deposit
         fields = ['amount']
@@ -31,11 +34,12 @@ class LoginForm(forms.Form):
 class MemberRegistrationForm(forms.ModelForm):
     username = forms.CharField(max_length=150)
     email = forms.EmailField()
-    password = forms.CharField(widget=forms.PasswordInput)
+    gender = forms.ChoiceField(choices=GENDER_CHOICES, widget=forms.RadioSelect)
+    department = forms.ChoiceField(choices=DEPARTMENT_CHOICES, widget=forms.RadioSelect)
 
     class Meta:
         model = Member
-        fields = ['username', 'first_name', 'last_name', 'email', 'dob', 'gender', 'profile_pic']
+        fields = ['first_name', 'last_name', 'email', 'dob', 'department', 'gender', 'profile_pic']
 
     def save(self, commit=True):
         user = User.objects.create_user(

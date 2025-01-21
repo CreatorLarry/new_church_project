@@ -19,16 +19,21 @@ from django.urls import path
 
 from main import views
 
+from django.conf import settings
+from django.conf.urls.static import static
+
 urlpatterns = [
     path('dashboard', views.dashboard, name='dashboard'),
 
     path('members', views.members, name='members'),
 
-    path('church_projects', views.church_projects, name='church_projects'),
+    path('church_projects/', views.church_projects, name='church_projects'),
 
     path('members/delete/<int:member_id>', views.delete_member, name='delete_member'),
 
     path('add/member', views.add_member, name='add_member'),
+
+    path('member_reg', views.member_reg, name='member_reg'),
 
     path('members/details/<int:member_id>', views.member_details, name='member_details'),
 
@@ -38,7 +43,7 @@ urlpatterns = [
 
     path('members/update/<int:member_id>', views.update_member, name='update_member'),
 
-    # path('members/profile/<int:member_id>/', views.profile, name='profile'),
+    path('profile_view/<int:member_id>/', views.profile_view, name='profile_view'),
 
     # path('members/search', views.search_member, name='search_member'),
 
@@ -56,5 +61,7 @@ urlpatterns = [
 
     path('logout/', views.logout_page, name='logout'),
 
+    # path('project/', views.project, name='project'),
+
     path('admin/', admin.site.urls),
-]
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

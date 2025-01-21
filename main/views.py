@@ -3,13 +3,17 @@ from enum import member
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.sites import requests
 from django.core.paginator import Paginator, EmptyPage
 from django.db.models import Q, Sum, Count
 from django.db.models.functions import TruncMonth
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
+from requests.auth import HTTPBasicAuth
 
+from New_Church_Project.settings import MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET
 from main.app_forms import MemberForm, DepositForm, LoginForm, MemberRegistrationForm
 from main.models import Member, Project, Transaction, Deposit
 
@@ -20,11 +24,16 @@ from main.models import Member, Project, Transaction, Deposit
 #     return None
 
 
+# @login_required
+# def dashboard(request):
+#     member = request.user  # Access the logged-in member's profile
+#     deposits = member.deposits.all()  # Fetch member's transactions
+#     return render(request, 'dashboard.html', {'member': member, 'deposit': deposit})
+
 @login_required
 def dashboard(request):
-    member = request.member.profile  # Access the logged-in member's profile
-    deposits = member.transactions.all()  # Fetch member's transactions
-    return render(request, 'dashboard.html', {'member': member, 'deposits': deposits})
+    member = request.user  # Access the logged-in member's profile
+    return render(request, 'dashboard.html')
 
 
 @login_required
@@ -40,18 +49,17 @@ def members(request):
 
 
 @login_required
-@permission_required
-def delete_member(request):
-    def delete_member(request, member_id):
-        member = Member.objects.get(id=member_id)
-        member.delete()
-        messages.info(request, f"Member {member.first_name} was deleted!!")
+@permission_required('main.delete_member', raise_exception=True)
+def delete_member(request, member_id):
+    member = Member.objects.get(id=member_id)
+    member.delete()
+    messages.info(request, f"Member {member.first_name} was deleted!!")
 
-        return redirect('members')
+    return redirect('members')
 
 
 @login_required
-@permission_required
+@permission_required('main.add_customer', raise_exception=True)
 def add_member(request):
     if request.method == "POST":
         form = Member(request.POST, request.FILES)
@@ -65,24 +73,25 @@ def add_member(request):
 
 
 @login_required
-@permission_required
-def deposit(request, member_id):
+@permission_required('main.add_deposit', raise_exception=True)
+def deposit(request, member_id, deposits=None):
     member = get_object_or_404(Member, id=member_id)
     if request.method == "POST":
         form = DepositForm(request.POST)
         if form.is_valid():
             amount = form.cleaned_data['amount']
-            depo = Deposit(amount=amount, status=True, member=member)
-            depo.save()
+            deposit_type = form.cleaned_data['deposits']
+            deposits = Deposit(amount=amount, status=True, member=member, deposit_type=deposit_type)
+            deposits.save()
             messages.success(request, 'Your deposit has been successfully saved')
-            return redirect('members')
+            return redirect('member_details', member_id=member_id)
     else:
         form = DepositForm()
-    return render(request, 'deposit_form.html', {"form": form, "member": member})
+    return render(request, 'deposit_form.html', {"form": form, "member": member,'deposits': deposits})
 
 
 @login_required
-@permission_required
+@permission_required('main.member_details', raise_exception=True)
 def member_details(request, member_id):
     member = Member.objects.get(id=member_id)
     deposits = member.deposits.all()
@@ -90,26 +99,41 @@ def member_details(request, member_id):
     return render(request, 'profile.html', {'member': member, 'deposits': deposits, 'total': total})
 
 
+
 def register(request):
     if request.method == 'POST':
-        form = MemberRegistrationForm(request.POST)
+        form = MemberRegistrationForm(request.POST, request.FILES)  # Include request.FILES for file uploads
         if form.is_valid():
-            form.save()
-            return redirect('login')  # Redirect to login page after registration
+            member = form.save()  # Save the form to the database
+            messages.success(request, f"Member {member.first_name} was added!")
+            return redirect('login')  # Redirect to the members page after adding
+        else:
+            messages.warning(request, "Member could not be added! Please check the form for errors.")
     else:
         form = MemberRegistrationForm()
+
     return render(request, 'member_reg.html', {'form': form})
 
 
-# @login_required
-# def profile(request, member_id):
-#     member = Member.objects.get(id=member_id)
-#     deposits = member.deposits.all()
-#     total = Deposit.objects.filter(member=member).filter(status=True).aggregate(Sum('amount'))['amount__sum']
-#     return render(request, 'profile.html', {'member': member, 'deposits': deposits, 'total': total})
 
 @login_required
-@permission_required
+def profile_view(request):
+    member = get_object_or_404(Member, user=request.user)
+    total = Deposit.objects.filter(member=member).filter(status=True).aggregate(Sum('amount'))['amount__sum']
+    personal_deposits = Transaction.objects.filter(member=member, transaction_type='deposit')
+
+    context = {
+        'member': member,
+        'personal_deposits': personal_deposits,
+        'total': total
+    }
+
+    return render(request, 'profile.html', context)
+
+
+
+@login_required
+@permission_required('app_name.permission_name', raise_exception=True)
 def update_member(request, member_id):
     member = get_object_or_404(Member, id=member_id)
     if request.method == "POST":
@@ -117,7 +141,7 @@ def update_member(request, member_id):
         if form.is_valid():
             form.save()
             messages.success(request, f"Member {form.cleaned_data['first_name']} was updated!")
-            return redirect('members')
+            return redirect('member_details', member_id=member_id)
     else:
         form = MemberForm(instance=member)
     return render(request, 'update_profile.html', {"form": form})
@@ -126,8 +150,7 @@ def update_member(request, member_id):
 # def search_member(request):
 #     return None
 #
-@login_required
-@permission_required
+@csrf_exempt
 def callback(request):
     # resp = json.loads(request.body)
     # data = resp['Body']['stkCallback']
@@ -157,9 +180,9 @@ def callback(request):
 @login_required
 def pie_chart(request):
     deposits = Deposit.objects.all()
-    grouped = deposits.values('deposit_for').annotate(count=Count('id'))
+    grouped = deposits.values('deposit_type').annotate(count=Count('id'))
 
-    labels = [item['deposit_for'] for item in grouped]
+    labels = [item['deposit_type'] for item in grouped]
     counts = [item['count'] for item in grouped]
 
     return JsonResponse({
@@ -246,29 +269,103 @@ def login_page(request):
         return render(request, "login.html", {"form": form})
 
 
+@login_required()
 def logout_page(request):
     logout(request)
     return redirect('login')
 
 
+# @login_required
+# def profile(request, member_id):
+#     member = request.user.member if hasattr(request.user, 'member') else None
+#
+#     if member and member.id:  # Ensure member and its ID exist
+#         profile_url = reverse('profile', kwargs={'member_id': member.id})
+#     else:
+#         profile_url = None  # No profile available for this user
+#
+#     return render(request, 'profile.html', {'profile_url': profile_url})
+
+
 @login_required
-def dashboard(request):
-    member = request.user.member if hasattr(request.user, 'member') else None
-
-    if member and member.id:  # Ensure member and its ID exist
-        profile_url = reverse('profile', kwargs={'member_id': member.id})
-    else:
-        profile_url = None  # No profile available for this user
-
-    return render(request, 'dashboard.html', {'profile_url': profile_url})
-
-
-@login_required
-@permission_required
 def church_projects(request):
     status = request.GET.get('status', None)
     if status:
         projects = Project.objects.filter(status=status)
     else:
         projects = Project.objects.all()
-    return render(request, 'church_projects.html', {'church_projects': church_projects})
+    return render(request, 'church_projects.html', {'projects': projects})
+
+
+# def project(request):
+#     return None
+@login_required
+@permission_required('main.add_member', raise_exception=True)
+def member_reg(request):
+    if request.method == 'POST':
+        form = MemberRegistrationForm(request.POST, request.FILES)  # Include request.FILES for file uploads
+        if form.is_valid():
+            member = form.save()  # Save the form to the database
+            messages.success(request, f"Member {member.first_name} was added!")
+            return redirect('members')  # Redirect to the members page after adding
+        else:
+            messages.warning(request, "Member could not be added! Please check the form for errors.")
+    else:
+        form = MemberRegistrationForm()
+
+    return render(request, 'member_form.html', {'form': form})
+
+
+@login_required
+def personal_deposit(request):
+    if request.method == 'POST':
+        form = DepositForm(request.POST)
+        if form.is_valid():
+            amount = form.cleaned_data['amount']
+            member = get_object_or_404(Member, user=request.user)
+
+            # Trigger M-Pesa Payment
+            mpesa_response = initiate_mpesa_payment(request.user.phone_number, amount)  # Adjust logic here
+            if mpesa_response.get('success'):
+                # Save transaction after successful M-Pesa payment
+                Transaction.objects.create(
+                    member=member,
+                    amount=amount,
+                    transaction_type='deposit',
+                )
+                return JsonResponse({'success': True, 'message': 'Deposit successful!'})
+            else:
+                return JsonResponse({'success': False, 'message': 'M-Pesa payment failed. Try again later.'})
+    else:
+        form = DepositForm()
+    return render(request, 'deposit_form.html', {'form': form})
+
+def get_mpesa_access_token():
+    url = "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials"
+    response = requests.get(url, auth=HTTPBasicAuth(MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET))
+    return response.json().get('access_token')
+
+def initiate_mpesa_payment(phone_number, amount):
+    access_token = get_mpesa_access_token()
+    api_url = "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    payload = {
+        "BusinessShortCode": '',
+        "Password": '',  # Generate Password Dynamically
+        "Timestamp": "20250117202530",  # Use a proper timestamp
+        "TransactionType": "CustomerPayBillOnline",
+        "Amount": amount,
+        "PartyA": phone_number,
+        "PartyB":'',
+        "PhoneNumber": phone_number,
+        "CallBackURL": "https://yourdomain.com/mpesa/callback",
+        "AccountReference": "Church Deposit",
+        "TransactionDesc": "Church Contribution",
+    }
+
+    response = requests.post(api_url, json=payload, headers=headers)
+    return response.json()

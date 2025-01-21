@@ -1,8 +1,10 @@
 import os
 import uuid
 
+from django.contrib.auth.models import User
 from django.contrib.auth.views import LoginView
 from django.db import models
+from django.forms import forms
 from django.utils.timezone import now
 
 
@@ -16,13 +18,14 @@ class MemberLoginView(LoginView):
 
 # Create your models here.
 class Member(models.Model):
+    # user = models.OneToOneField(User, on_delete=models.CASCADE)
     first_name = models.CharField(max_length=30)
     last_name = models.CharField(max_length=30)
     department = models.CharField(max_length=30)
     email = models.EmailField(unique=True)
     dob = models.DateField()
     gender = models.CharField(max_length=10)
-    profile_pic = models.ImageField(upload_to=generate_unique_name, null=True)
+    profile_pic = models.ImageField(upload_to=generate_unique_name, null=True, )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -35,25 +38,25 @@ class Member(models.Model):
         db_table = 'members'
 
 
+
+
 class Deposit(models.Model):
+    DEPOSIT_CHOICES = [
+        ('tithe', 'Tithe'),
+        ('thanksgiving', 'Thanksgiving'),
+        ('wedding', 'Wedding'),
+        ('offertory', 'Offertory'),
+        ('first_fruits', 'First Fruit'),
+        ('department_registration', 'Department Registration'),
+        ('church_projects', 'Church Project'),
+        ('others', 'Others'),
+    ]
     amount = models.IntegerField()
     status = models.BooleanField(default=False)
-    deposit_for = models.CharField(
-        max_length=200,
-        choices=[
-            ('TITHE', 'Tithe'),
-            ('THANKSGIVING', 'Thanksgiving'),
-            ('WEDDING', 'Wedding'),
-            ('OFFERTORY', 'Offertory'),
-            ('FIRST FRUIT', 'First Fruit'),
-            ('CHURCH PROJECT', 'Church Project'),
-            ('OTHERS', 'Others'),
-        ],
-        default='OFFERTORY',
-    )
     member = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='deposits')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    deposit_type = models.CharField(max_length=100, choices=DEPOSIT_CHOICES, default = 'offertory')
 
     def __str__(self):
         return f"{self.member.first_name} - {self.amount}"
@@ -135,6 +138,20 @@ class Department(models.Model):
         verbose_name = "Department"
         verbose_name_plural = "Departments"
         ordering = ['name']
+
+class DepositForm(forms.Form):
+    member = models.ForeignKey('Member', on_delete=models.CASCADE, related_name='transactions')
+    amount = models.IntegerField(default=200)  # Default monthly registration fee
+    month = models.DateField(default=now)  # Track the month of payment
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharField(max_length=20, default='PENDING')
+    merchant_request_id = models.CharField(max_length=100)
+    code = models.CharField(max_length=30, null=True)
+    checkout_request_id = models.CharField(max_length=100)
+
+    def __str__(self):
+        return f'{self.member.first_name} - {self.amount} Ksh ({self.month.strftime("%B %Y")})'
 
 # def __str__(self):
 #     return f'{self.merchant_request_id} - {self.code} - {self.amount}'

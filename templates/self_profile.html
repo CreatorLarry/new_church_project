@@ -1,0 +1,88 @@
+{% extends 'master.html' %}
+{% load static %}
+
+{% block title %}
+	<title>{{ member.first_name }} Details</title>
+{% endblock %}
+
+{% block content %}
+	<div class="container">
+       <div class="row border mt-2 p-2">
+           <div class="col-sm-4">
+               <table class="table table-striped">
+
+                   <tr>
+                       <th>#</th>
+                       <th>Value</th>
+                   </tr>
+
+                   <tr>
+                       <td class="h6">First Name</td>
+                       <td>{{ member.first_name }}</td>
+                   </tr>
+
+                    <tr>
+                       <td class="h6">Last Name</td>
+                       <td>{{ member.last_name }}</td>
+                   </tr>
+
+                   <tr>
+                       <td class="h6">Email</td>
+                       <td>{{ member.email }}</td>
+                   </tr>
+
+                   <tr>
+                       <td class="h6">Date Of Birth</td>
+                       <td>{{ member.dob }}</td>
+                   </tr>
+
+                   <tr>
+                       <td class="h6">Joining Date</td>
+                       <td>{{ member.created_at | date:"d-m-Y" }}</td>
+                   </tr>
+
+                   <tr>
+                       <td class="h6">Gender</td>
+                       <td>{{ member.gender }}</td>
+                   </tr>
+
+                   <tr>
+                       <td class="h6">Department</td>
+                       <td>{{ member.department}}</td>
+                   </tr>
+
+                   <tr>
+                       <td class="h6">Total Deposit</td>
+                       <td>{{ total }}</td>
+                   </tr>
+               </table>
+           </div>
+           <div class="col-sm-4">
+               <p class="text-center">Profile Picture</p>
+               {% if member.profile_pic %}
+               	 <img class="img-fluid mx-auto d-block profile" src="{{ member.profile_pic.url }}" alt="">
+               {% else %}
+               	 <img class="img-fluid mx-auto d-block profile" src="{% static 'img/default.png' %}" alt="">
+               {% endif %}
+
+           </div>
+           <div class="col-sm-4">
+               <p>Deposits</p>
+               <table class="table table-striped">
+                   <tr>
+                       <th>Date</th>
+                       <th>Amount</th>
+                       <th>Status</th>
+                   </tr>
+                   {% for deposit in deposits %}
+                       <tr>
+                           <td>{{ deposit.created_at | date:"d-m-Y" }}</td>
+                           <td>{{ deposit.amount }}</td>
+                           <td>{{ deposit.status }}</td>
+                       </tr>
+                   {% endfor %}
+               </table>
+           </div>
+       </div>
+    </div>
+{% endblock %}
